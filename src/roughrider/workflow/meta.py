@@ -152,7 +152,7 @@ class WorkflowItem:
                         self.item, **self.namespace)}
 
     def set_state(self, target: str):
-        if not target in self.workflow:
+        if target not in self.workflow:
             raise LookupError(f'Unknown target state `{target}`.')
         origin = self.state
         if (action := origin.actions.get(target)) is not None:
