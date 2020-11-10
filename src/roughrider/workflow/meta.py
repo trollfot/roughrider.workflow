@@ -22,6 +22,22 @@ class StatefulItem(ABC):
     __workflow_state__: Optional[str] = None
 
 
+def resolve_validators(
+        validators: List[Validator], item: Any, **namespace) -> Errors:
+    """Checks the validators against the given object.
+    """
+    errors = []
+    for validator in validators:
+        try:
+            validator.validate(item, **namespace)
+        except exceptions.Error as exc:
+            errors.append(exc)
+        except exceptions.ConstraintsErrors as exc:
+            errors.extend(exc.errors)
+    if errors:
+        return exceptions.ConstraintsErrors(*errors)
+
+
 class OR(Validator):
 
     def __init__(self, *validators):
@@ -36,25 +52,18 @@ class OR(Validator):
             except exceptions.Error as exc:
                 errors.append(exc)
             except exceptions.ConstraintsErrors as exc:
-                errors.extends(exc.errors)
+                errors.extend(exc.errors)
 
-        raise exceptions.ConstraintsError(*errors)
+        raise exceptions.ConstraintsErrors(*errors)
 
 
-def resolve_validators(
-        validators: List[Validator], item: Any, **namespace) -> Errors:
-    """Checks the validators against the given object.
-    """
-    errors = []
-    for validator in validators:
-        try:
-            validator.validate(item, **namespace)
-        except exceptions.Error as exc:
-            errors.append(exc)
-        except exceptions.ConstraintsErrors as exc:
-            errors.extends(exc.errors)
-    if errors:
-        return exceptions.ConstraintsErrors(*errors)
+class AND(Validator):
+
+    def __init__(self, *validators):
+        self.validators = validators
+
+    def validate(self, item: Any, **namespace) -> Errors:
+        raise resolve_validators(self.validators, item, **namespace)
 
 
 @dataclass

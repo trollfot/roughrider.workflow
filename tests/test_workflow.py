@@ -1,6 +1,7 @@
 import pytest
-from roughrider.workflow.exceptions import Error
-from roughrider.workflow.meta import OR, Workflow, Validator, StatefulItem
+from roughrider.workflow.exceptions import Error, ConstraintsErrors
+from roughrider.workflow.meta import (
+    AND, OR, Workflow, Validator, StatefulItem)
 
 
 class Document(StatefulItem):
@@ -33,7 +34,8 @@ class RoleValidator(Validator):
 
     def validate(self, item, role=None, **namespace):
         if role != self.role:
-            raise Error(message=f'Unauthorized. Missing the `{role}` role.')
+            raise Error(
+                message=f'Unauthorized. Missing the `{self.role}` role.')
 
 
 workflow.add_action(
@@ -105,6 +107,115 @@ def test_worflow_unknown_transition():
     workflow_item = workflow(item)
     with pytest.raises(LookupError):
         workflow_item.set_state('submitted')
+
+
+def test_worflow_constraints_errors():
+    item = Document()
+    workflow.default_state = 'draft'
+    workflow_item = workflow(item)
+
+    with pytest.raises(ConstraintsErrors) as exc:
+        workflow_item.set_state('published')
+
+    errors = exc.value.errors
+    assert len(errors) == 2
+    assert errors[0].message == 'Body is empty.'
+    assert errors[1].message == 'Unauthorized. Missing the `publisher` role.'
+
+    item.body = "A body."
+    with pytest.raises(ConstraintsErrors) as exc:
+        workflow_item.set_state('published')
+
+    errors = exc.value.errors
+    assert len(errors) == 1
+    assert errors[0].message == 'Unauthorized. Missing the `publisher` role.'
+
+
+def test_worflow_OR_constraints_errors():
+    item = Document()
+    item.body = "My article is great."
+    workflow.default_state = 'published'
+    workflow_item = workflow(item)
+
+    with pytest.raises(ConstraintsErrors) as exc:
+        workflow_item.set_state('draft')
+
+    errors = exc.value.errors
+    assert len(errors) == 2
+    assert errors[0].message == 'Unauthorized. Missing the `owner` role.'
+    assert errors[1].message == 'Unauthorized. Missing the `publisher` role.'
+
+    workflow_item = workflow(item, role="owner")
+    workflow_item.set_state('draft')
+
+
+def test_worflow_stacked_OR_constraints_errors():
+
+    workflow.add_action(
+        'Archive', origin='draft', target='archived',
+        constraints=[OR(RoleValidator('owner'),
+                        OR(RoleValidator('archiver'), NonEmptyDocument))],
+        triggers=[]
+    )
+
+    item = Document()
+    workflow.default_state = 'draft'
+    workflow_item = workflow(item)
+
+    with pytest.raises(ConstraintsErrors) as exc:
+        workflow_item.set_state('archived')
+
+    errors = exc.value.errors
+    assert len(errors) == 3
+    assert errors[0].message == 'Unauthorized. Missing the `owner` role.'
+    assert errors[1].message == 'Unauthorized. Missing the `archiver` role.'
+    assert errors[2].message == 'Body is empty.'
+
+    item.body = "My Article"
+    workflow_item.set_state('archived')
+
+    del workflow.states['draft'].actions['archived']
+    del workflow.states['archived']
+
+
+def test_worflow_stacked_OR_AND_constraints_errors():
+
+    workflow.add_action(
+        'Archive', origin='draft', target='archived',
+        constraints=[OR(RoleValidator('owner'),
+                        AND(RoleValidator('archiver'), NonEmptyDocument))],
+        triggers=[]
+    )
+
+    item = Document()
+    workflow.default_state = 'draft'
+    workflow_item = workflow(item)
+
+    with pytest.raises(ConstraintsErrors) as exc:
+        workflow_item.set_state('archived')
+
+    errors = exc.value.errors
+    assert len(errors) == 3
+    assert errors[0].message == 'Unauthorized. Missing the `owner` role.'
+    assert errors[1].message == 'Unauthorized. Missing the `archiver` role.'
+    assert errors[2].message == 'Body is empty.'
+
+
+    item.body = "My Article"
+    with pytest.raises(ConstraintsErrors) as exc:
+        workflow_item.set_state('archived')
+
+    errors = exc.value.errors
+    assert len(errors) == 2
+    assert errors[0].message == 'Unauthorized. Missing the `owner` role.'
+    assert errors[1].message == 'Unauthorized. Missing the `archiver` role.'
+
+    item.body = ""
+    workflow_item = workflow(item, role="owner")
+    workflow_item.set_state('archived')
+
+    del workflow.states['draft'].actions['archived']
+    del workflow.states['archived']
 
 
 def test_publish_worflow():
