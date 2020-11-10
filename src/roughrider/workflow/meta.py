@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Mapping, Callable
+from typing import Any, List, Optional, Mapping, Callable
 from dataclasses import dataclass, field
 from roughrider.workflow import exceptions
 
@@ -18,12 +18,16 @@ class Validator(ABC):
         """
 
 
+class StatefulItem(ABC):
+    __workflow_state__: Optional[str] = None
+
+
 class OR(Validator):
 
     def __init__(self, *validators):
         self.validators = validators
 
-    def validate(self, item, **namespace) -> Errors:
+    def validate(self, item: Any, **namespace) -> Errors:
         errors = []
         for validator in self.validators:
             try:
@@ -38,7 +42,7 @@ class OR(Validator):
 
 
 def resolve_validators(
-        validators: List[Validator], item, **namespace) -> Errors:
+        validators: List[Validator], item: Any, **namespace) -> Errors:
     """Checks the validators against the given object.
     """
     errors = []
@@ -60,7 +64,7 @@ class Action:
     constraints: List[Validator] = field(default_factory=list)
     triggers: List[Callable] = field(default_factory=list)
 
-    def check_constraints(self, item, **namespace) -> Errors:
+    def check_constraints(self, item: Any, **namespace) -> Errors:
         """Checks the constraints against the given object.
         """
         if self.constraints:
@@ -79,7 +83,7 @@ class State:
         self.actions[target] = action
         return action
 
-    def available_actions(self, item, **namespace):
+    def available_actions(self, item: Any, **namespace):
         for target, action in self.actions.items():
             if action.check_constraints(item, **namespace) is None:
                 yield action.identifier, target
@@ -87,9 +91,14 @@ class State:
 
 class Workflow:
 
+    default_state: str
+
     def __init__(self, default_state):
         self.states = {}
         self.default_state = default_state
+
+    def __contains__(self, name: str) -> bool:
+        return name in self.states
 
     def __getitem__(self, name: str) -> State:
         return self.states[name]
@@ -123,7 +132,10 @@ class Workflow:
 
 class WorkflowItem:
 
-    def __init__(self, workflow, item, **namespace):
+    def __init__(self, workflow: Workflow, item: StatefulItem, **namespace):
+        if not isinstance(item, StatefulItem):
+            raise TypeError(f'Item needs to be of type {StatefulItem}')
+
         self.item = item
         self.workflow = workflow
         self.namespace = namespace
@@ -139,13 +151,17 @@ class WorkflowItem:
                 for action, target_state in self.state.available_actions(
                         self.item, **self.namespace)}
 
-    def set_state(self, target_state: str):
-        if (target_action := self.state.actions.get(target_state)) is not None:
-            if (error := target_action.check_constraints(
+    def set_state(self, target: str):
+        if not target in self.workflow:
+            raise LookupError(f'Unknown target state `{target}`.')
+        origin = self.state
+        if (action := origin.actions.get(target)) is not None:
+            if (error := action.check_constraints(
                     self.item, **self.namespace)) is not None:
                 raise error
-            for trigger in target_action.triggers:
+            for trigger in action.triggers:
                 trigger(self.item, **self.namespace)
-            self.item.__workflow_state__ = target_state
+            self.item.__workflow_state__ = target
             return
-        raise LookupError('Unknow action {action}')
+        raise LookupError(
+            f'No transition from {origin.identifier} to {target}. ')
