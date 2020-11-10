@@ -1,5 +1,6 @@
 import pytest
-from roughrider.workflow.graph import OR, Workflow, Validator, Error
+from roughrider.workflow.exceptions import Error
+from roughrider.workflow.meta import OR, Workflow, Validator
 
 
 class Document:
