@@ -1,17 +1,11 @@
 import pytest
-from roughrider.workflow.graph import OR, Workflow, Validator, Error
+from roughrider.workflow.graph import (
+    WorkflowState, OR, Workflow, Validator, Error, Action, Transition, Transitions)
 
 
 class Document:
     __workflow_state__ = None
     body = ""
-
-
-class PublicationWorkflow(Workflow):
-    pass
-
-
-workflow = PublicationWorkflow(default_state='draft')
 
 
 def submit_trigger(item, **namespace):
@@ -36,43 +30,69 @@ class RoleValidator(Validator):
             raise Error(message=f'Unauthorized. Missing the `{role}` role.')
 
 
-workflow.add_action(
-    'Publish', origin='draft', target='published',
-    constraints=[NonEmptyDocument, RoleValidator('publisher')],
-    triggers=[]
-)
+class PublicationWorkflow(Workflow):
 
-workflow.add_action(
-    'Retract', origin='published', target='draft',
-    constraints=[OR(RoleValidator('owner'), RoleValidator('publisher'))],
-    triggers=[]
-)
+    class states(WorkflowState):
+        draft = 'Draft'
+        published = 'Published'
+        submitted = 'Submitted'
 
-workflow.add_action(
-    'Submit', origin='draft', target='submitted',
-    constraints=[NonEmptyDocument, RoleValidator('owner')],
-    triggers=[submit_trigger]
-)
 
-workflow.add_action(
-    'Publish', origin='submitted', target='published',
-    constraints=[NonEmptyDocument, RoleValidator('publisher')],
-    triggers=[]
-)
+    transitions = Transitions(
+        publish_directly=Transition(
+            origin=states.draft,
+            target=states.published,
+            action=Action(
+                'Publish',
+                constraints=[NonEmptyDocument, RoleValidator('publisher')]
+            )
+        ),
+        retract=Transition(
+            origin=states.published,
+            target=states.draft,
+            action=Action(
+                'Retract',
+                constraints=[
+                    OR(RoleValidator('owner'),
+                       RoleValidator('publisher'))
+                ]
+            )
+        ),
+        submit=Transition(
+            origin=states.draft,
+            target=states.submitted,
+            action=Action(
+                'Submit',
+                constraints=[NonEmptyDocument, RoleValidator('owner')],
+                triggers=[submit_trigger]
+            )
+        ),
+        publish=Transition(
+            origin=states.submitted,
+            target=states.published,
+            action=Action(
+                'Publish',
+                constraints=[NonEmptyDocument, RoleValidator('publisher')],
+            )
+        )
+    )
+
+
+workflow = PublicationWorkflow('draft')
 
 
 def test_publish_worflow():
     item = Document()
     workflow_item = workflow(item, role='some role')
-    assert workflow_item.state == workflow.states.get('draft')
-    assert workflow_item.get_target_states() == {}
+    assert workflow_item.state == workflow.get_state('draft')
+    assert workflow_item.get_possible_transitions() == {}
 
     item.body = "Some text here"
-    assert workflow_item.get_target_states() == {}
+    assert workflow_item.get_possible_transitions() == {}
 
     workflow_item = workflow(item, role='owner')
-    assert workflow_item.get_target_states() == {
-        'Submit': workflow['submitted']
+    assert workflow_item.get_possible_transitions() == {
+        'submit': workflow.transitions['submit']
     }
 
     with pytest.raises(RuntimeError) as exc:

@@ -1,5 +1,7 @@
+import enum
+import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Iterable, List, Optional, Mapping, Callable
+from typing import Type, Iterable, List, Optional, Mapping, Callable
 from dataclasses import dataclass, field
 
 
@@ -85,50 +87,54 @@ class Action:
 
 @dataclass
 class State:
-
     identifier: str
-    actions: Mapping[str, Action] = field(default_factory=dict)
 
-    def add_action(self, target: str, name: str,
-                   constraints: list, triggers: list):
-        self.actions[target] = Action(name, constraints, triggers)
 
-    def available_actions(self, item, **namespace):
-        for target, action in self.actions.items():
-            if action.check_constraints(item, **namespace) is None:
-                yield action.identifier, target
+class WorkflowState(State, enum.Enum):
+    pass
+
+
+from collections import UserDict
+
+class Transitions(UserDict):
+
+    def available(self, origin, item, **ns):
+        for name, trn in self.items():
+            if trn.origin != origin:
+                continue
+            if trn.action.check_constraints(item, **ns) is None:
+                yield name, trn
+
+    def find(self, origin, target):
+        for name, trn in self.items():
+            if trn.origin == origin and trn.target == target:
+                return trn
+        raise LookupError(f'No transition from {origin} to {target}')
+
+
+@dataclass
+class Transition:
+    action: Action
+    origin: WorkflowState
+    target: WorkflowState
 
 
 class Workflow:
 
+    states: Type[WorkflowState]
+    transitions: Mapping[str, Transition]
+    default_state: WorkflowState
+
     def __init__(self, default_state):
-        self.states = {}
-        self.default_state = default_state
+        self.default_state = self.states[default_state]  # idempotent
 
     def __getitem__(self, name):
         return self.states[name]
 
-    def add_state(self, identifier):
-        state = State(identifier)
-        self.states[identifier] = state
-        return state
-
-    def get_state(self, identifier):
-        if identifier is None:
-            return self.states[self.default_state]
-        return self.states[identifier]
-
-    def add_action(self, name: str, origin: str, target: str,
-                   constraints: list, triggers: list):
-        origin_state = self.states.get(origin)
-        if origin_state is None:
-            origin_state = self.add_state(origin)
-
-        target_state = self.states.get(target)
-        if target_state is None:
-            target_state = self.add_state(target)
-
-        origin_state.add_action(target, name, constraints, triggers)
+    def get_state(self, name):
+        if name is None:
+            return self.default_state
+        return self.states[name]
 
     def __call__(self, item, **namespace):
         return WorkflowItem(self, item, **namespace)
@@ -147,18 +153,17 @@ class WorkflowItem:
             return self.workflow.get_state(self.item.__workflow_state__)
         return self.workflow.get_state(None)
 
-    def get_target_states(self):
-        return {action: self.workflow.get_state(target_state)
-                for action, target_state in self.state.available_actions(
-                        self.item, **self.namespace)}
+    def get_possible_transitions(self):
+        return dict(self.workflow.transitions.available(
+            self.state, self.item, **self.namespace))
 
     def set_state(self, target_state: str):
-        if (target_action := self.state.actions.get(target_state)) is not None:
-            if (error := target_action.check_constraints(
-                    self.item, **self.namespace)) is not None:
-                raise error
-            for trigger in target_action.triggers:
-                trigger(self.item, **self.namespace)
-            self.item.__workflow_state__ = target_state
-            return
-        raise LookupError('Unknow action {action}')
+        target = self.workflow.states[target_state]
+        trn = self.workflow.transitions.find(self.state, target)
+        error = trn.action.check_constraints(self.item, **self.namespace)
+        if error is not None:
+            raise error
+        for trigger in trn.action.triggers:
+            trigger(self.item, **self.namespace)
+        self.item.__workflow_state__ = target.name
+        return
