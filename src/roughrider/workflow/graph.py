@@ -1,7 +1,9 @@
 import enum
 import inspect
+from collections import UserDict
 from abc import ABC, abstractmethod
-from typing import Type, Iterable, List, Optional, Mapping, Callable
+from typing import NamedTuple
+from typing import Type, Iterable, List, Tuple, Optional, Mapping, Callable
 from dataclasses import dataclass, field
 
 
@@ -94,29 +96,24 @@ class WorkflowState(State, enum.Enum):
     pass
 
 
-from collections import UserDict
-
-class Transitions(UserDict):
-
-    def available(self, origin, item, **ns):
-        for name, trn in self.items():
-            if trn.origin != origin:
-                continue
-            if trn.action.check_constraints(item, **ns) is None:
-                yield name, trn
-
-    def find(self, origin, target):
-        for name, trn in self.items():
-            if trn.origin == origin and trn.target == target:
-                return trn
-        raise LookupError(f'No transition from {origin} to {target}')
-
-
-@dataclass
-class Transition:
+class Transition(NamedTuple):
     action: Action
     origin: WorkflowState
     target: WorkflowState
+
+
+class Transitions(Tuple[Transition]):
+
+    def available(self, origin, item, **ns):
+        return (trn for trn in self
+                if (trn.origin == origin and
+                    trn.action.check_constraints(item, **ns) is None))
+
+    def find(self, origin, target):
+        for trn in self:
+            if trn.origin == origin and trn.target == target:
+                return trn
+        raise LookupError(f'No transition from {origin} to {target}')
 
 
 class Workflow:
@@ -154,7 +151,7 @@ class WorkflowItem:
         return self.workflow.get_state(None)
 
     def get_possible_transitions(self):
-        return dict(self.workflow.transitions.available(
+        return tuple(self.workflow.transitions.available(
             self.state, self.item, **self.namespace))
 
     def set_state(self, target_state: str):
