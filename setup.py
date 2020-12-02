@@ -9,7 +9,6 @@ install_requires = [
 ]
 
 test_requires = [
-    'WebTest',
     'pytest',
 ]
 
@@ -21,7 +20,7 @@ setup(
     author_email='trollfot@gmail.com',
     url='http://gitweb.dolmen-project.org',
     download_url='http://pypi.python.org/pypi/roughrider.workflow',
-    description='Headless WSGI API',
+    description='Pure python workflow/transition system.',
     long_description=(open("README.txt").read() + "\n" +
                       open(os.path.join("docs", "HISTORY.txt")).read()),
     license='ZPL',
