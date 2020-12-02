@@ -1,11 +1,12 @@
 import pytest
-from roughrider.workflow.validation import Error, Validator, OR
-from roughrider.workflow.transition import Action, Transition, Transitions
-from roughrider.workflow.workflow import WorkflowState, Workflow
+from roughrider.workflow import (
+    Error, Validator, OR,
+    Action, Transition, Transitions,
+    WorkflowItem, WorkflowState, Workflow)
 
 
 class Document:
-    __workflow_state__ = None
+    state = None
     body = ""
 
 
@@ -32,6 +33,17 @@ class RoleValidator(Validator):
 
 
 class PublicationWorkflow(Workflow):
+
+    class wrapper(WorkflowItem):
+
+        def get_state(self):
+            return self.workflow.get(self.item.state)
+
+        def set_state(self, state):
+            if (error := self.check_reachable(state)):
+                raise error
+            self.item.state = state.name
+
 
     class states(WorkflowState):
         draft = 'Draft'
@@ -85,18 +97,18 @@ workflow = PublicationWorkflow('draft')
 def test_publish_worflow():
     item = Document()
     workflow_item = workflow(item, role='some role')
-    assert workflow_item.state == workflow.get('draft')
-    assert workflow_item.get_possible_actions() == ()
+    assert workflow_item.get_state() == workflow.get('draft')
+    assert workflow_item.get_possible_transitions() == ()
 
     item.body = "Some text here"
-    assert workflow_item.get_possible_actions() == ()
+    assert workflow_item.get_possible_transitions() == ()
 
     workflow_item = workflow(item, role='owner')
-    assert workflow_item.get_possible_actions() == (
+    assert workflow_item.get_possible_transitions() == (
         workflow.transitions[2],
     )
 
     with pytest.raises(RuntimeError) as exc:
-        workflow_item.set_state('submitted')
+        workflow_item.set_state(PublicationWorkflow.states.submitted)
 
     assert str(exc.value) == 'I did trigger !!'
