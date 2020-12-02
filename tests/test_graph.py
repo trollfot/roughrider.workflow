@@ -85,13 +85,13 @@ def test_publish_worflow():
     item = Document()
     workflow_item = workflow(item, role='some role')
     assert workflow_item.state == workflow.get_state('draft')
-    assert workflow_item.get_possible_transitions() == ()
+    assert workflow_item.get_possible_actions() == ()
 
     item.body = "Some text here"
-    assert workflow_item.get_possible_transitions() == ()
+    assert workflow_item.get_possible_actions() == ()
 
     workflow_item = workflow(item, role='owner')
-    assert workflow_item.get_possible_transitions() == (
+    assert workflow_item.get_possible_actions() == (
         workflow.transitions[2],
     )
 

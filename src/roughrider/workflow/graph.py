@@ -1,6 +1,6 @@
 import enum
 import inspect
-from collections import UserDict
+from collections import defaultdict
 from abc import ABC, abstractmethod
 from typing import NamedTuple
 from typing import Type, Iterable, List, Tuple, Optional, Mapping, Callable
@@ -91,35 +91,47 @@ class Action:
 class State:
     identifier: str
 
+    def __hash__(self):
+        return hash(self.identifier)
+
+
+class Transition(NamedTuple):
+    action: Action
+    origin: State
+    target: State
+
+
+class Transitions(Tuple[Transition]):
+
+    _edges: Mapping[State, Mapping[State, Action]] = None
+
+    def __new__(cls, transitions: Iterable[Transition]):
+        obj = super().__new__(Transitions, transitions)
+        obj._edges = defaultdict(dict)
+        for trn in transitions:
+            obj._edges[trn.origin][trn.target] = trn
+        return obj
+
+    def available(self, origin, item, **ns):
+        for target, trn in self._edges[origin].items():
+            if trn.action.check_constraints(item, **ns) is None:
+                yield trn
+
+    def find(self, origin, target):
+        try:
+            return self._edges[origin][target]
+        except KeyError:
+            raise LookupError(f'No transition from {origin} to {target}')
+
 
 class WorkflowState(State, enum.Enum):
     pass
 
 
-class Transition(NamedTuple):
-    action: Action
-    origin: WorkflowState
-    target: WorkflowState
-
-
-class Transitions(Tuple[Transition]):
-
-    def available(self, origin, item, **ns):
-        return (trn for trn in self
-                if (trn.origin == origin and
-                    trn.action.check_constraints(item, **ns) is None))
-
-    def find(self, origin, target):
-        for trn in self:
-            if trn.origin == origin and trn.target == target:
-                return trn
-        raise LookupError(f'No transition from {origin} to {target}')
-
-
 class Workflow:
 
     states: Type[WorkflowState]
-    transitions: Mapping[str, Transition]
+    transitions: Transitions
     default_state: WorkflowState
 
     def __init__(self, default_state):
@@ -150,7 +162,7 @@ class WorkflowItem:
             return self.workflow.get_state(self.item.__workflow_state__)
         return self.workflow.get_state(None)
 
-    def get_possible_transitions(self):
+    def get_possible_actions(self):
         return tuple(self.workflow.transitions.available(
             self.state, self.item, **self.namespace))
 
