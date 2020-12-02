@@ -1,6 +1,7 @@
 import pytest
-from roughrider.workflow.graph import (
-    WorkflowState, OR, Workflow, Validator, Error, Action, Transition, Transitions)
+from roughrider.workflow.validation import Error, Validator, OR
+from roughrider.workflow.transition import Action, Transition, Transitions
+from roughrider.workflow.workflow import WorkflowState, Workflow
 
 
 class Document:
@@ -53,8 +54,8 @@ class PublicationWorkflow(Workflow):
             action=Action(
                 'Retract',
                 constraints=[
-                    OR(RoleValidator('owner'),
-                       RoleValidator('publisher'))
+                    OR((RoleValidator('owner'),
+                        RoleValidator('publisher')))
                 ]
             )
         ),
@@ -84,7 +85,7 @@ workflow = PublicationWorkflow('draft')
 def test_publish_worflow():
     item = Document()
     workflow_item = workflow(item, role='some role')
-    assert workflow_item.state == workflow.get_state('draft')
+    assert workflow_item.state == workflow.get('draft')
     assert workflow_item.get_possible_actions() == ()
 
     item.body = "Some text here"
