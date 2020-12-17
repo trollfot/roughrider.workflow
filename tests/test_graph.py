@@ -10,10 +10,6 @@ class Document:
     body = ""
 
 
-def submit_trigger(trn, item, role, messages):
-    messages.append('I did trigger !!')
-
-
 class NonEmptyDocument(Validator):
 
     @classmethod
@@ -77,7 +73,6 @@ class PublicationWorkflow(Workflow):
             action=Action(
                 'Submit',
                 constraints=[NonEmptyDocument, RoleValidator('owner')],
-                triggers=[submit_trigger]
             )
         ),
         Transition(
@@ -92,6 +87,11 @@ class PublicationWorkflow(Workflow):
 
 
 workflow = PublicationWorkflow('draft')
+
+
+@workflow.subscribe('Submit')
+def submit_trigger(trn, item, role, messages):
+    messages.append('I did trigger !!')
 
 
 def test_publish_worflow():

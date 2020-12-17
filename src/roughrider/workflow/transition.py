@@ -10,7 +10,6 @@ class Action:
 
     identifier: str
     constraints: Iterable[Validator] = field(default_factory=list)
-    triggers: Iterable[Callable] = field(default_factory=list)
 
     def check_constraints(self, item, **ns) -> Optional[ConstraintsErrors]:
         """Checks the constraints against the given object.

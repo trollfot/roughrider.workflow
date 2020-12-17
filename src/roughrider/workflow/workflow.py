@@ -1,6 +1,7 @@
 import enum
 from abc import ABC, abstractproperty
-from typing import Type, Optional
+from collections import defaultdict
+from typing import Type, Optional, Dict, Callable
 from roughrider.workflow.transition import State, Transitions, Transition
 from roughrider.workflow.validation import ConstraintsErrors
 
@@ -36,8 +37,9 @@ class WorkflowItem(ABC):
         if error is not None:
             raise error
         self.state = transition.target
-        for trigger in transition.action.triggers:
-            trigger(transition, self.item, **self.namespace)
+        self.workflow.notify(
+            transition.action.identifier,
+            transition, self.item, **self.namespace)
 
     def transition_to(self, state: State):
         transition = self.get_transition(state)
@@ -50,17 +52,30 @@ class Workflow:
     wrapper: Type[WorkflowItem]
     transitions: Transitions
     default_state: WorkflowState
+    subscribers: Dict[str, Callable]
 
     def __init__(self, default_state):
         self.default_state = self.states[default_state]  # idempotent
+        self.subscribers = defaultdict(list)
 
     def __getitem__(self, name) -> WorkflowState:
         return self.states[name]
+
+    def __call__(self, item, **namespace):
+        return self.wrapper(self, item, **namespace)
 
     def get(self, name=None):
         if name is None:
             return self.default_state
         return self.states[name]
 
-    def __call__(self, item, **namespace):
-        return self.wrapper(self, item, **namespace)
+    def subscribe(self, event_name: str):
+        def wrapper(func):
+            self.subscribers[event_name].append(func)
+        return wrapper
+
+    def notify(self, event_name: str, *args, **kwargs):
+        if event_name in self.subscribers:
+            for subscriber in self.subscribers[event_name]:
+                if (result := subscriber(*args, **kwargs)):
+                    return result
