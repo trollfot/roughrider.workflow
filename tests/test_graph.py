@@ -10,8 +10,8 @@ class Document:
     body = ""
 
 
-def submit_trigger(trn, item, **namespace):
-    raise RuntimeError('I did trigger !!')
+def submit_trigger(trn, item, role, messages):
+    messages.append('I did trigger !!')
 
 
 class NonEmptyDocument(Validator):
@@ -98,17 +98,16 @@ def test_publish_worflow():
     item = Document()
     workflow_item = workflow(item, role='some role')
     assert workflow_item.state == workflow.get('draft')
-    assert workflow_item.get_possible_transitions() == ()
+    assert not workflow_item.get_possible_transitions()
 
     item.body = "Some text here"
-    assert workflow_item.get_possible_transitions() == ()
+    assert not workflow_item.get_possible_transitions()
 
-    workflow_item = workflow(item, role='owner')
+    messages = []
+    workflow_item = workflow(item, role='owner', messages=messages)
     assert workflow_item.get_possible_transitions() == (
         workflow.transitions[2],
     )
 
-    with pytest.raises(RuntimeError) as exc:
-        workflow_item.transition_to(PublicationWorkflow.states.submitted)
-
-    assert str(exc.value) == 'I did trigger !!'
+    workflow_item.transition_to(PublicationWorkflow.states.submitted)
+    assert messages == ['I did trigger !!']
