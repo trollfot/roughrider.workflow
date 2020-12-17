@@ -1,7 +1,7 @@
 import enum
-from abc import ABC, abstractmethod
+from abc import ABC, abstractproperty
 from typing import Type, Optional
-from roughrider.workflow.transition import State, Transitions
+from roughrider.workflow.transition import State, Transitions, Transition
 from roughrider.workflow.validation import ConstraintsErrors
 
 
@@ -11,34 +11,37 @@ class WorkflowState(State, enum.Enum):
 
 class WorkflowItem(ABC):
 
+    state: WorkflowState
+
     def __init__(self, workflow, item, **namespace):
         self.workflow = workflow
         self.item = item
         self.namespace = namespace
 
+    @abstractproperty
+    def state(self):
+        pass
+
     def get_possible_transitions(self):
-        origin = self.get_state()
         return tuple(self.workflow.transitions.available(
-            origin, self.item, **self.namespace))
+             self.state, self.item, **self.namespace))
 
-    def check_reachable(self, state: State) -> Optional[ConstraintsErrors]:
-        origin = self.get_state()
-        target = self.workflow.states(state)  # idempotent
-        trn = self.workflow.transitions.find(origin, target)
-        error = trn.action.check_constraints(self.item, **self.namespace)
+    def get_transition(self, target: State) -> Optional[Transition]:
+        target = self.workflow.states(target)  # idempotent
+        return self.workflow.transitions.find(self.state, target)
+
+    def apply_transition(self, transition: Transition):
+        error = transition.action.check_constraints(
+            self.item, **self.namespace)
         if error is not None:
-            return error
-        for trigger in trn.action.triggers:
-            trigger(self.item, **self.namespace)
-        return None
+            raise error
+        self.state = transition.target
+        for trigger in transition.action.triggers:
+            trigger(transition, self.item, **self.namespace)
 
-    @abstractmethod
-    def get_state(self) -> WorkflowState:
-        pass
-
-    @abstractmethod
-    def set_state(self, state: WorkflowState):
-        pass
+    def transition_to(self, state: State):
+        transition = self.get_transition(state)
+        self.apply_transition(transition)
 
 
 class Workflow:

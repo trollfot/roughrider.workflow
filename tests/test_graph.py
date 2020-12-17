@@ -10,7 +10,7 @@ class Document:
     body = ""
 
 
-def submit_trigger(item, **namespace):
+def submit_trigger(trn, item, **namespace):
     raise RuntimeError('I did trigger !!')
 
 
@@ -36,12 +36,12 @@ class PublicationWorkflow(Workflow):
 
     class wrapper(WorkflowItem):
 
-        def get_state(self):
+        @property
+        def state(self):
             return self.workflow.get(self.item.state)
 
-        def set_state(self, state):
-            if (error := self.check_reachable(state)):
-                raise error
+        @state.setter
+        def state(self, state):
             self.item.state = state.name
 
 
@@ -97,7 +97,7 @@ workflow = PublicationWorkflow('draft')
 def test_publish_worflow():
     item = Document()
     workflow_item = workflow(item, role='some role')
-    assert workflow_item.get_state() == workflow.get('draft')
+    assert workflow_item.state == workflow.get('draft')
     assert workflow_item.get_possible_transitions() == ()
 
     item.body = "Some text here"
@@ -109,6 +109,6 @@ def test_publish_worflow():
     )
 
     with pytest.raises(RuntimeError) as exc:
-        workflow_item.set_state(PublicationWorkflow.states.submitted)
+        workflow_item.transition_to(PublicationWorkflow.states.submitted)
 
     assert str(exc.value) == 'I did trigger !!'
