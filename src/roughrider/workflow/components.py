@@ -1,8 +1,16 @@
 from collections import defaultdict
-from typing import NamedTuple, Iterable, Tuple, Optional, Mapping, Callable
+from typing import NamedTuple, Iterable, Tuple, Optional, Mapping
 from dataclasses import dataclass, field
 from roughrider.workflow.validation import (
     Validator, resolve_validators, ConstraintsErrors)
+
+
+@dataclass
+class State:
+    identifier: str
+
+    def __hash__(self):
+        return hash(self.identifier)
 
 
 @dataclass
@@ -16,14 +24,6 @@ class Action:
         """
         if self.constraints:
             return resolve_validators(self.constraints, item, **ns)
-
-
-@dataclass
-class State:
-    identifier: str
-
-    def __hash__(self):
-        return hash(self.identifier)
 
 
 class Transition(NamedTuple):

@@ -1,7 +1,7 @@
 import pytest
-from roughrider.workflow import (
-    Error, Validator, OR,
-    Action, Transition, Transitions,
+from roughrider.workflow.validation import Error, Validator, OR
+from roughrider.workflow.components import Action, Transition, Transitions
+from roughrider.workflow.workflow import (
     WorkflowItem, WorkflowState, Workflow)
 
 
@@ -10,12 +10,9 @@ class Document:
     body = ""
 
 
-class NonEmptyDocument(Validator):
-
-    @classmethod
-    def validate(cls, item, **namespace):
-        if not item.body:
-            raise Error(message='Body is empty.')
+def NonEmptyDocument(item, **namespace):
+    if not item.body:
+        raise Error(message='Body is empty.')
 
 
 class RoleValidator(Validator):
@@ -23,7 +20,7 @@ class RoleValidator(Validator):
     def __init__(self, role):
         self.role = role
 
-    def validate(self, item, role=None, **namespace):
+    def __call__(self, item, role=None, **namespace):
         if role != self.role:
             raise Error(message=f'Unauthorized. Missing the `{role}` role.')
 

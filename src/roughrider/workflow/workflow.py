@@ -2,8 +2,7 @@ import enum
 from abc import ABC, abstractproperty
 from collections import defaultdict
 from typing import Type, Optional, Dict, Callable
-from roughrider.workflow.transition import State, Transitions, Transition
-from roughrider.workflow.validation import ConstraintsErrors
+from roughrider.workflow.components import State, Transitions, Transition
 
 
 class WorkflowState(State, enum.Enum):
