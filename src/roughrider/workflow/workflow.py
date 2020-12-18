@@ -54,10 +54,13 @@ class Workflow:
     subscribers: Dict[str, Callable]
 
     def __init__(self, default_state):
-        self.default_state = self.states[default_state]  # idempotent
+        if default_state in self.states.__members__:
+            self.default_state = self.states[default_state]
+        else:
+            self.default_state = self.states(default_state)
         self.subscribers = defaultdict(list)
 
-    def __getitem__(self, name) -> WorkflowState:
+    def __getitem__(self, name: str) -> WorkflowState:
         return self.states[name]
 
     def __call__(self, item, **namespace):

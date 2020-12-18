@@ -1,6 +1,5 @@
 from roughrider.workflow.components import Action
-from roughrider.workflow.validation import (
-    Validator, Error, ConstraintsErrors)
+from roughrider.predicate import Validator, Error, ConstraintsErrors
 
 
 def test_no_constraints_action():

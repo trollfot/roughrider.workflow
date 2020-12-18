@@ -1,1 +1,2 @@
 -e .
+-e git+git@github.com:trollfot/roughrider.predicate.git#egg=roughrider.predicate

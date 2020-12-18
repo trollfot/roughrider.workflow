@@ -1,5 +1,5 @@
 import pytest
-from roughrider.workflow.validation import Error, Validator, OR
+from roughrider.predicate import Error, Validator, Or
 from roughrider.workflow.components import Action, Transition, Transitions
 from roughrider.workflow.workflow import (
     WorkflowItem, WorkflowState, Workflow)
@@ -59,7 +59,7 @@ class PublicationWorkflow(Workflow):
             action=Action(
                 'Retract',
                 constraints=[
-                    OR((RoleValidator('owner'),
+                    Or((RoleValidator('owner'),
                         RoleValidator('publisher')))
                 ]
             )

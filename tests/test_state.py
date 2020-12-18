@@ -24,4 +24,5 @@ def test_workflow_states():
     assert states.foo.identifier == 'Foo'
 
     assert states('Foo') is states.foo
+    assert states(states.foo) is states.foo
     assert states['foo'] is states.foo

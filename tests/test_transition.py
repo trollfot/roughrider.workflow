@@ -1,7 +1,7 @@
 import pytest
 from roughrider.workflow.components import Action, Transition, Transitions
 from roughrider.workflow.workflow import WorkflowState
-from roughrider.workflow.validation import Error
+from roughrider.predicate.validators import Error
 
 
 def only_test(item: str):

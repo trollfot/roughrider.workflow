@@ -1,8 +1,8 @@
 from collections import defaultdict
 from typing import NamedTuple, Iterable, Tuple, Optional, Mapping
 from dataclasses import dataclass, field
-from roughrider.workflow.validation import (
-    Validator, resolve_validators, ConstraintsErrors)
+from roughrider.predicate.validators import Constraint, resolve_validators
+from roughrider.predicate.errors import ConstraintsErrors
 
 
 @dataclass
@@ -17,7 +17,7 @@ class State:
 class Action:
 
     identifier: str
-    constraints: Iterable[Validator] = field(default_factory=list)
+    constraints: Iterable[Constraint] = field(default_factory=list)
 
     def check_constraints(self, item, **ns) -> Optional[ConstraintsErrors]:
         """Checks the constraints against the given object.
