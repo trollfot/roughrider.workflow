@@ -1,5 +1,5 @@
 from roughrider.workflow.components import Action
-from roughrider.predicate import Validator, Error, ConstraintsErrors
+from roughrider.predicate import Validator, ConstraintError, ConstraintsErrors
 
 
 def test_no_constraints_action():
@@ -13,7 +13,7 @@ def test_constraint_action():
 
     def tester(item, **namespace):
         if item != 'test':
-            raise Error('This needs to be a test')
+            raise ConstraintError('This needs to be a test')
 
     action = Action(identifier='Test', constraints=[tester])
     assert action.identifier == 'Test'
@@ -22,6 +22,6 @@ def test_constraint_action():
     errors = action.check_constraints('not test')
     assert isinstance(errors, ConstraintsErrors)
     assert len(errors) == 1
-    assert list(errors) == [Error('This needs to be a test')]
+    assert list(errors) == [ConstraintError('This needs to be a test')]
 
     assert not action.check_constraints('test')

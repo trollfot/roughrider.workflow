@@ -1,12 +1,12 @@
 import pytest
 from roughrider.workflow.components import Action, Transition, Transitions
 from roughrider.workflow.workflow import WorkflowState
-from roughrider.predicate.validators import Error
+from roughrider.predicate.validators import ConstraintError
 
 
 def only_test(item: str):
     if item != 'test':
-        raise Error('We need a test')
+        raise ConstraintError('We need a test')
 
 
 class states(WorkflowState):
