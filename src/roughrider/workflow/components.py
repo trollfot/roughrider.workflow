@@ -1,23 +1,33 @@
 from collections import defaultdict
 from typing import NamedTuple, Iterable, Tuple, Optional, Mapping
-from dataclasses import dataclass, field
 from roughrider.predicate.validators import Constraint, resolve_validators
 from roughrider.predicate.errors import ConstraintsErrors
 
 
-@dataclass
 class State:
     identifier: str
+
+    def __init__(self, identifier: str):
+        self.identifier = identifier
 
     def __hash__(self):
         return hash(self.identifier)
 
 
-@dataclass
 class Action:
 
     identifier: str
-    constraints: Iterable[Constraint] = field(default_factory=list)
+    constraints: Iterable[Constraint]
+
+    def __init__(self, identifier: str, constraints: Optional[list] = None):
+        self.identifier = identifier
+        self.constraints = constraints if constraints is not None else []
+
+    def __eq__(self, other):
+        if isinstance(other, Action):
+            return (self.identifier == other.identifier and
+                    self.constraints == other.constraints)
+        return False
 
     def check_constraints(self, item, **ns) -> Optional[ConstraintsErrors]:
         """Checks the constraints against the given object.
