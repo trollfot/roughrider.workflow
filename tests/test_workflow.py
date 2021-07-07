@@ -87,11 +87,6 @@ class PublicationWorkflow(Workflow):
 workflow = PublicationWorkflow('draft')
 
 
-@workflow.subscribe('Submit')
-def submit_trigger(trn, item, role, messages):
-    messages.append('I did trigger !!')
-
-
 def test_publish_worflow():
     item = Document()
     workflow_item = workflow(item, role='some role')
@@ -101,11 +96,10 @@ def test_publish_worflow():
     item.body = "Some text here"
     assert not workflow_item.get_possible_transitions()
 
-    messages = []
-    workflow_item = workflow(item, role='owner', messages=messages)
+    workflow_item = workflow(item, role='owner')
     assert workflow_item.get_possible_transitions() == (
         workflow.transitions[2],
     )
 
     workflow_item.transition_to(PublicationWorkflow.states.submitted)
-    assert messages == ['I did trigger !!']
+    assert workflow_item.state == workflow.get('submitted')
