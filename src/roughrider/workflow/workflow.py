@@ -36,9 +36,6 @@ class WorkflowItem(ABC):
         if error is not None:
             raise error
         self.state = transition.target
-        self.workflow.notify(
-            transition.action.identifier,
-            transition, self.item, **self.namespace)
 
     def transition_to(self, state: State):
         transition = self.get_transition(state)
@@ -51,14 +48,12 @@ class Workflow:
     wrapper: Type[WorkflowItem]
     transitions: Transitions
     default_state: WorkflowState
-    subscribers: Dict[str, Callable]
 
     def __init__(self, default_state):
         if default_state in self.states.__members__:
             self.default_state = self.states[default_state]
         else:
             self.default_state = self.states(default_state)
-        self.subscribers = defaultdict(list)
 
     def __getitem__(self, name: str) -> WorkflowState:
         return self.states[name]
@@ -70,14 +65,3 @@ class Workflow:
         if name is None:
             return self.default_state
         return self.states[name]
-
-    def subscribe(self, event_name: str):
-        def wrapper(func):
-            self.subscribers[event_name].append(func)
-            return func
-        return wrapper
-
-    def notify(self, event_name: str, *args, **kwargs):
-        for subscriber in self.subscribers[event_name]:
-            if (result := subscriber(*args, **kwargs)):
-                return result
